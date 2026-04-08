@@ -3,7 +3,7 @@
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireCompany, requireProfessional } from "@/lib/session";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import { z } from "zod";
 
 import type { ActionResult } from "@/actions/task.actions";

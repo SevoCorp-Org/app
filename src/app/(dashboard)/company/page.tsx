@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCompany } from "@/lib/session";
 import { CheckCircle2, ClipboardList, Clock, FolderOpen, LayoutDashboard, Users } from "lucide-react";
 import Link from "next/link";
-import type { TaskPriority, TaskStatus } from "@prisma/client";
+import type { TaskPriority, TaskStatus } from "@/lib/enums";
 
 export const metadata = { title: "Dashboard — SevoCorp" };
 

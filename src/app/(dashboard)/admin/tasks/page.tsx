@@ -6,7 +6,7 @@ import { QuickApproveButton, QuickReviewActions } from "@/components/admin/Admin
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { cn } from "@/lib/utils";
-import { TaskStatus } from "@prisma/client";
+import { TaskStatus } from "@/lib/enums";
 import { CalendarDays, ClipboardList, Users } from "lucide-react";
 import Link from "next/link";
 

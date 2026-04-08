@@ -8,7 +8,7 @@ import { CreateTaskSheet } from "@/components/company/CreateTaskSheet";
 import { prisma } from "@/lib/prisma";
 import { requireCompany } from "@/lib/session";
 import { cn } from "@/lib/utils";
-import type { TaskStatus } from "@prisma/client";
+import type { TaskStatus } from "@/lib/enums";
 import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 

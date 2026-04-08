@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireProfessional } from "@/lib/session";
 import { getAllowedTransitions, TASK_STATUS_LABELS } from "@/lib/task-transitions";
-import { Role, TaskStatus } from "@prisma/client";
+import { Role, TaskStatus } from "@/lib/enums";
 import { Building2, CalendarDays, FolderOpen, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";

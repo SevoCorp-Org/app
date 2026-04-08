@@ -1,4 +1,4 @@
-import { Role, TaskStatus } from "@prisma/client";
+import { Role, TaskStatus } from "@/lib/enums";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Task Lifecycle

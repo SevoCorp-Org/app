@@ -1,5 +1,6 @@
 "use client";
 
+import { saveUploadedFile } from "@/actions/upload.actions";
 import { useUploadThing } from "@/lib/uploadthing";
 import { useCallback, useState } from "react";
 
@@ -48,6 +49,7 @@ export function TaskFileUpload({
   const [uploading, setUploading] = useState(false);
 
   const { startUpload, isUploading } = useUploadThing("taskAttachment", {
+    skipPolling: true,
     onUploadProgress: (p) => setProgress(p),
 
     onClientUploadComplete: (res) => {
@@ -56,15 +58,39 @@ export function TaskFileUpload({
       setProgress(0);
       setError(null);
 
-      if (onUploadComplete && res) {
-        onUploadComplete(
-          res.map((r) => ({
-            name: r.name,
-            url: r.ufsUrl ?? r.url ?? "",
-            size: r.size,
-          }))
-        );
+      if (!res?.length) return;
+
+      const mapped = res.map((r) => ({
+        name: r.name,
+        url:  r.ufsUrl ?? (r as unknown as { url: string }).url ?? "",
+        key:  r.key,
+        size: r.size,
+        type: r.type ?? "application/octet-stream",
+      }));
+
+      // Notify parent immediately so files appear in the list
+      if (onUploadComplete) {
+        onUploadComplete(mapped.map((f) => ({ name: f.name, url: f.url, size: f.size })));
       }
+
+      // Save DB records in the background (fire-and-forget with error display)
+      Promise.all(
+        mapped.map((f) =>
+          saveUploadedFile({
+            taskId,
+            filename: f.name,
+            url:      f.url,
+            key:      f.key,
+            size:     f.size,
+            mimeType: f.type,
+          })
+        )
+      ).then((results) => {
+        const failed = results.filter((r) => !r.ok);
+        if (failed.length) {
+          setError("Files uploaded but failed to save. Please refresh the page.");
+        }
+      });
     },
 
     onUploadError: (err) => {

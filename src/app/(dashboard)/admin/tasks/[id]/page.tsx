@@ -11,11 +11,12 @@ import { CommentThread } from "@/components/comments/CommentThread";
 import type { CommentData } from "@/components/comments/types";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
+import { DeleteTaskButton } from "@/components/admin/AdminTaskQuickActions";
 import { UploadedFileList } from "@/components/upload/UploadedFileList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { TaskStatus } from "@prisma/client";
+import { TaskStatus } from "@/lib/enums";
 import { Building2, CalendarDays, FolderOpen, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -151,6 +152,9 @@ export default async function AdminTaskDetailPage({
         <div className="flex shrink-0 flex-col items-end gap-2">
           <StatusBadge status={task.status} />
           <PriorityBadge priority={task.priority} />
+          {task.status !== TaskStatus.COMPLETED && (
+            <DeleteTaskButton taskId={task.id} taskTitle={task.title} />
+          )}
         </div>
       </div>
 

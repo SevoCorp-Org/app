@@ -1,4 +1,5 @@
 import { transitionTaskStatus } from "@/actions/task.actions";
+import { revalidatePath } from "next/cache";
 import { CommentThread } from "@/components/comments/CommentThread";
 import type { CommentData } from "@/components/comments/types";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireCompany } from "@/lib/session";
 import { getAllowedTransitions, TASK_STATUS_LABELS } from "@/lib/task-transitions";
-import { Role, TaskStatus } from "@prisma/client";
+import { Role, TaskStatus } from "@/lib/enums";
 import { CalendarDays, FolderOpen, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -17,13 +18,14 @@ import { notFound } from "next/navigation";
 export default async function CompanyTaskDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const session   = await requireCompany();
   const companyId = session.user.companyId!;
+  const { id }    = await params;
 
   const task = await prisma.task.findFirst({
-    where: { id: params.id, companyId },
+    where: { id, companyId },
     include: {
       workspace: { select: { id: true, name: true } },
       createdBy: { select: { name: true } },
@@ -156,6 +158,7 @@ export default async function CompanyTaskDetailPage({
                       action={async () => {
                         "use server";
                         await transitionTaskStatus({ taskId: task!.id, to: toStatus });
+                        revalidatePath(`/company/tasks/${task!.id}`);
                       }}
                     >
                       <button

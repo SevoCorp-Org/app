@@ -1,5 +1,5 @@
 import { authOptions } from "@/lib/auth";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 

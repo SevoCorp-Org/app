@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { prisma } from "@/lib/prisma";
 import { requireProfessional } from "@/lib/session";
 import { cn } from "@/lib/utils";
-import { TaskStatus } from "@prisma/client";
+import { TaskStatus } from "@/lib/enums";
 import { Briefcase, CalendarDays, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
@@ -33,32 +33,25 @@ export default async function ProfessionalTasksPage({
     ? (params.status as TaskStatus)
     : undefined;
 
-  const [assignments, counts] = await Promise.all([
-    prisma.taskAssignment.findMany({
-      where: {
-        professionalId,
-        ...(statusFilter && { task: { status: statusFilter } }),
-      },
-      orderBy: { assignedAt: "desc" },
-      select: {
-        assignedAt: true,
-        task: {
-          select: {
-            id: true, title: true, description: true,
-            status: true, priority: true, dueDate: true,
-            workspace: { select: { name: true } },
-            company:   { select: { name: true } },
-            _count:    { select: { comments: true } },
-          },
+  const assignments = await prisma.taskAssignment.findMany({
+    where: {
+      professionalId,
+      ...(statusFilter && { task: { status: statusFilter } }),
+    },
+    orderBy: { assignedAt: "desc" },
+    select: {
+      assignedAt: true,
+      task: {
+        select: {
+          id: true, title: true, description: true,
+          status: true, priority: true, dueDate: true,
+          workspace: { select: { name: true } },
+          company:   { select: { name: true } },
+          _count:    { select: { comments: true } },
         },
       },
-    }),
-    prisma.taskAssignment.groupBy({
-      by: [],
-      where: { professionalId },
-      _count: true,
-    }),
-  ]);
+    },
+  });
 
   // Count per status for tabs
   const allAssignments = await prisma.taskAssignment.findMany({

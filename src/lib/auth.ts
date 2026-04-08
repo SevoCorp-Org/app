@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 

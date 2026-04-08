@@ -1,7 +1,6 @@
-import { writeAuditLog } from "@/lib/audit";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import { getServerSession } from "next-auth";
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
@@ -96,41 +95,12 @@ export const ourFileRouter = {
       return resolveUploadContext(input.taskId);
     })
 
-    .onUploadComplete(async ({ metadata, file }) => {
-      try {
-        const url = file.ufsUrl ?? (file as unknown as { url: string }).url ?? "";
-
-        await prisma.$transaction(async (tx) => {
-          const upload = await tx.fileUpload.create({
-            data: {
-              filename:     file.name,
-              url,
-              key:          file.key,
-              size:         file.size,
-              mimeType:     file.type ?? "application/octet-stream",
-              uploadedById: metadata.actorId,
-              companyId:    metadata.companyId,
-              taskId:       metadata.taskId,
-            },
-          });
-
-          await writeAuditLog({
-            tx,
-            action:    "UPLOADED",
-            entity:    "FileUpload",
-            entityId:  upload.id,
-            actorId:   metadata.actorId,
-            companyId: metadata.companyId,
-            taskId:    metadata.taskId,
-            meta: { filename: file.name, size: file.size, mimeType: file.type },
-          });
-        });
-
-        return { filename: file.name, url };
-      } catch (err) {
-        console.error("[uploadthing] onUploadComplete failed:", err);
-        throw err;
-      }
+    .onUploadComplete(async ({ file }) => {
+      // DB record is saved by the client via saveUploadedFile() server action
+      // (UploadThing cannot reach localhost in dev, so we don't rely on this callback for DB writes).
+      // This handler must succeed so the client receives onClientUploadComplete.
+      const url = file.ufsUrl ?? (file as unknown as { url: string }).url ?? "";
+      return { filename: file.name, url };
     }),
 
   // ── commentAttachment ───────────────────────────────────────────────────
@@ -159,42 +129,10 @@ export const ourFileRouter = {
       return { ...ctx, commentId: input.commentId ?? null };
     })
 
-    .onUploadComplete(async ({ metadata, file }) => {
-      try {
-        const url = file.ufsUrl ?? (file as unknown as { url: string }).url ?? "";
-
-        await prisma.$transaction(async (tx) => {
-          const upload = await tx.fileUpload.create({
-            data: {
-              filename:     file.name,
-              url,
-              key:          file.key,
-              size:         file.size,
-              mimeType:     file.type ?? "application/octet-stream",
-              uploadedById: metadata.actorId,
-              companyId:    metadata.companyId,
-              taskId:       metadata.taskId,
-              commentId:    metadata.commentId,
-            },
-          });
-
-          await writeAuditLog({
-            tx,
-            action:    "UPLOADED",
-            entity:    "FileUpload",
-            entityId:  upload.id,
-            actorId:   metadata.actorId,
-            companyId: metadata.companyId,
-            taskId:    metadata.taskId,
-            meta: { filename: file.name, commentId: metadata.commentId },
-          });
-        });
-
-        return { filename: file.name, url };
-      } catch (err) {
-        console.error("[uploadthing] commentAttachment onUploadComplete failed:", err);
-        throw err;
-      }
+    .onUploadComplete(async ({ file }) => {
+      // DB record is saved by the client via saveUploadedFile() server action.
+      const url = file.ufsUrl ?? (file as unknown as { url: string }).url ?? "";
+      return { filename: file.name, url };
     }),
 
 } satisfies FileRouter;

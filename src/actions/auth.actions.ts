@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getDashboardUrl } from "@/lib/session";
 import { sendEmail } from "@/lib/mailer";
 import { createVerificationToken, createPasswordResetToken, consumeToken } from "@/lib/tokens";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 

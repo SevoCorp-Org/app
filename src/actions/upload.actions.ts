@@ -3,7 +3,7 @@
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireCompany, requireProfessional } from "@/lib/session";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/enums";
 import { UTApi } from "uploadthing/server";
 import { z } from "zod";
 
@@ -24,6 +24,104 @@ async function resolveSession() {
   try { return await requireAdmin(); }       catch { /* */ }
   try { return await requireCompany(); }     catch { /* */ }
   return await requireProfessional();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// saveUploadedFile
+//
+// Called from the client immediately after UploadThing confirms a successful
+// upload (onClientUploadComplete). Because UploadThing cannot reach localhost
+// in development, the server-side onUploadComplete callback never fires, so
+// we save the DB record here instead.
+//
+// In production both paths would work, but this client-driven approach is
+// more reliable across all environments.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SaveUploadSchema = z.object({
+  taskId:   z.string().min(1),
+  filename: z.string().min(1),
+  url:      z.string().url(),
+  key:      z.string().min(1),
+  size:     z.number().int().positive(),
+  mimeType: z.string().min(1),
+});
+
+export async function saveUploadedFile(
+  raw: z.input<typeof SaveUploadSchema>
+): Promise<ActionResult<{ fileId: string }>> {
+  const session = await resolveSession();
+  const actorId = session.user.id;
+  const role    = session.user.role as Role;
+
+  const parsed = SaveUploadSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]!.message };
+  }
+
+  const { taskId, filename, url, key, size, mimeType } = parsed.data;
+
+  // Verify task exists and user has access
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      companyId: true,
+      status: true,
+      assignments: { select: { professionalId: true } },
+    },
+  });
+
+  if (!task) return { ok: false, error: "Task not found." };
+
+  if (role === Role.COMPANY && task.companyId !== session.user.companyId) {
+    return { ok: false, error: "Access denied." };
+  }
+
+  if (role === Role.PROFESSIONAL) {
+    const isAssigned = task.assignments.some(
+      (a) => a.professionalId === session.user.professionalId
+    );
+    if (!isAssigned) return { ok: false, error: "You are not assigned to this task." };
+  }
+
+  try {
+    const upload = await prisma.$transaction(async (tx) => {
+      // Upsert by key so re-saves (e.g. network retry) don't create duplicates
+      const existing = await tx.fileUpload.findFirst({ where: { key }, select: { id: true } });
+      if (existing) return existing;
+
+      const created = await tx.fileUpload.create({
+        data: {
+          filename,
+          url,
+          key,
+          size,
+          mimeType,
+          uploadedById: actorId,
+          companyId:    task.companyId,
+          taskId:       task.id,
+        },
+      });
+
+      await writeAuditLog({
+        tx,
+        action:    "UPLOADED",
+        entity:    "FileUpload",
+        entityId:  created.id,
+        actorId,
+        companyId: task.companyId,
+        taskId:    task.id,
+        meta: { filename, size, mimeType },
+      });
+
+      return created;
+    });
+
+    return { ok: true, data: { fileId: upload.id } };
+  } catch {
+    return { ok: false, error: "Failed to save file record." };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

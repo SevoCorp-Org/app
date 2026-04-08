@@ -7,7 +7,7 @@ import {
   canTransition,
   TASK_STATUS_LABELS,
 } from "@/lib/task-transitions";
-import { Role, TaskPriority, TaskStatus } from "@prisma/client";
+import { Role, TaskPriority, TaskStatus } from "@/lib/enums";
 import { z } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
