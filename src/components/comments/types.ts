@@ -29,6 +29,8 @@ export interface CommentData {
   uploads: CommentAttachment[];
   // Replies are attached by the server before passing to CommentThread
   replies?: CommentData[];
+  // Set to true while the comment is pending server confirmation
+  _optimistic?: boolean;
 }
 
 // Shape of a comment being added optimistically before the server confirms it
