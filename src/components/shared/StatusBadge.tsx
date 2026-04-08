@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { TaskStatus } from "@prisma/client";
+
+// Plain string union — no @prisma/client import (safe for client components)
+type TaskStatus = "PENDING" | "APPROVED" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   PENDING:     "Pending",

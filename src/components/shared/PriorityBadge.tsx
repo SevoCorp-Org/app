@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { TaskPriority } from "@prisma/client";
+
+// Plain string union — no @prisma/client import (safe for client components)
+type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
   LOW:    "Low",
