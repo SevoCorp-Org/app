@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
 
@@ -29,7 +29,7 @@ export async function GET(
   }
 
   const role = session.user.role as Role;
-  const taskId = params.id;
+  const { id: taskId } = await params;
 
   // ── Access check ────────────────────────────────────────────────────────────
 
