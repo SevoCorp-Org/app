@@ -49,7 +49,6 @@ export function TaskFileUpload({
   const [uploading, setUploading] = useState(false);
 
   const { startUpload, isUploading } = useUploadThing("taskAttachment", {
-    skipPolling: true,
     onUploadProgress: (p) => setProgress(p),
 
     onClientUploadComplete: (res) => {

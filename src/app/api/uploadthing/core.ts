@@ -83,12 +83,15 @@ export const ourFileRouter = {
   // Max: 10 files per request, 32 MB each.
   // Accepted: images, PDFs, Word docs, Excel, plain text, zip.
 
-  taskAttachment: f({
-    image:  { maxFileSize: "8MB",  maxFileCount: 10 },
-    pdf:    { maxFileSize: "32MB", maxFileCount: 10 },
-    text:   { maxFileSize: "4MB",  maxFileCount: 10 },
-    blob:   { maxFileSize: "32MB", maxFileCount: 10 }, // covers .docx, .xlsx, .zip, etc.
-  })
+  taskAttachment: f(
+    {
+      image:  { maxFileSize: "8MB",  maxFileCount: 10 },
+      pdf:    { maxFileSize: "32MB", maxFileCount: 10 },
+      text:   { maxFileSize: "4MB",  maxFileCount: 10 },
+      blob:   { maxFileSize: "32MB", maxFileCount: 10 },
+    },
+    { awaitServerData: false }
+  )
     .input(z.object({ taskId: z.string().min(1) }))
 
     .middleware(async ({ input }) => {
@@ -111,12 +114,15 @@ export const ourFileRouter = {
   //
   // Max: 4 files per request, 8 MB each.
 
-  commentAttachment: f({
-    image:  { maxFileSize: "8MB", maxFileCount: 4 },
-    pdf:    { maxFileSize: "8MB", maxFileCount: 4 },
-    text:   { maxFileSize: "2MB", maxFileCount: 4 },
-    blob:   { maxFileSize: "8MB", maxFileCount: 4 },
-  })
+  commentAttachment: f(
+    {
+      image:  { maxFileSize: "8MB", maxFileCount: 4 },
+      pdf:    { maxFileSize: "8MB", maxFileCount: 4 },
+      text:   { maxFileSize: "2MB", maxFileCount: 4 },
+      blob:   { maxFileSize: "8MB", maxFileCount: 4 },
+    },
+    { awaitServerData: false }
+  )
     .input(
       z.object({
         taskId:    z.string().min(1),
