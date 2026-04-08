@@ -1,0 +1,435 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// SevoCorp Virtual Department System — Prisma Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  COMPANY
+  PROFESSIONAL
+}
+
+enum TaskStatus {
+  PENDING
+  APPROVED
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  DELETED
+  ASSIGNED
+  UNASSIGNED
+  STATUS_CHANGED
+  COMMENTED
+  UPLOADED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER
+// Core identity record. One user = one role. Role determines which
+// profile record (Company or Professional) is linked to this user.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role      @default(PROFESSIONAL)
+  isActive      Boolean   @default(true)
+
+  // Profile relations (at most one will be set per user)
+  company      Company?
+  professional Professional?
+
+  // Authorship relations
+  createdTasks Task[]       @relation("TaskCreatedBy")
+  comments     Comment[]    @relation("CommentAuthor")
+  uploads      FileUpload[] @relation("FileUploadedBy")
+  auditLogs    AuditLog[]   @relation("AuditActor")
+
+  // NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPANY
+// One Company per COMPANY-role user. Acts as the tenant root.
+// All workspaces, tasks, and files are scoped under companyId.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Company {
+  id       String  @id @default(cuid())
+  name     String
+  slug     String  @unique // used in URLs: /company/acme-corp
+  logo     String?
+  website  String?
+  industry String?
+  isActive Boolean @default(true)
+
+  // Each company is owned by exactly one COMPANY-role user
+  ownerId String @unique
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  // Tenant-scoped relations
+  workspaces   Workspace[]
+  professionals CompanyProfessional[]
+  tasks        Task[]       // denormalized for fast tenant-scoped queries
+  uploads      FileUpload[]
+  auditLogs    AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFESSIONAL
+// Profile for PROFESSIONAL-role users. Platform-wide — not owned by one
+// company. Hired into companies via CompanyProfessional join table.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Professional {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bio          String?
+  title        String?  // e.g. "Senior UX Designer"
+  skills       String[] // PostgreSQL text array — e.g. ["React", "Figma"]
+  avatarUrl    String?
+  available    Boolean  @default(true)
+  hourlyRate   Decimal? @db.Decimal(10, 2)
+
+  // Which companies this professional works with
+  companies   CompanyProfessional[]
+
+  // Which workspaces they are a member of
+  workspaces  WorkspaceMember[]
+
+  // Task assignments
+  assignments TaskAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([available])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPANY_PROFESSIONAL
+// Join table: which professionals are hired/active within a company.
+// A professional can work for multiple companies.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CompanyProfessional {
+  id             String       @id @default(cuid())
+  companyId      String
+  professionalId String
+  status         MemberStatus @default(INVITED)
+
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  joinedAt  DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@unique([companyId, professionalId])
+  @@index([companyId])
+  @@index([professionalId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKSPACE
+// A logical group of tasks inside a company. Think: "Design Team",
+// "Q1 Onboarding", "Backend Sprint 3".
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Workspace {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  isArchived  Boolean @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  tasks   Task[]
+  members WorkspaceMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, isArchived])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKSPACE_MEMBER
+// Join table: which professionals have access to a specific workspace.
+// Professionals must be in CompanyProfessional before joining a workspace.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WorkspaceMember {
+  id             String @id @default(cuid())
+  workspaceId    String
+  professionalId String
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([workspaceId, professionalId])
+  @@index([workspaceId])
+  @@index([professionalId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK
+// Core unit of work. Lives in a Workspace, scoped to a Company.
+// companyId is denormalized here to avoid expensive joins on tenant queries.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+
+  // Workspace scope
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Denormalized tenant key — avoids join through workspace → company on every query
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Who created the task (COMPANY user or ADMIN)
+  createdById String
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  assignments TaskAssignment[]
+  comments    Comment[]
+  uploads     FileUpload[]
+  auditLogs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([companyId, status])         // common dashboard filter
+  @@index([companyId, status, dueDate]) // sorted task views
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK_ASSIGNMENT
+// Many-to-many: a task can be assigned to multiple professionals;
+// a professional can hold multiple task assignments.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TaskAssignment {
+  id             String @id @default(cuid())
+  taskId         String
+  professionalId String
+
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@unique([taskId, professionalId])
+  @@index([taskId])
+  @@index([professionalId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMENT
+// Threaded comments on tasks. Each comment belongs to one task and one author.
+// Supports optional parent for nested/reply threads.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Comment {
+  id       String @id @default(cuid())
+  body     String @db.Text
+  isEdited Boolean @default(false)
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  // Self-relation for nested replies (one level recommended)
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  Comment[] @relation("CommentReplies")
+
+  uploads FileUpload[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE_UPLOAD
+// Files can be attached to a task or a comment (one or the other, not both).
+// companyId is present for tenant-scoped file listing and cleanup.
+// url points to cloud storage (e.g. S3, Cloudflare R2).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FileUpload {
+  id       String @id @default(cuid())
+  filename String // original filename
+  url      String // storage URL (S3 / R2 / Supabase Storage)
+  key      String // storage object key for deletion
+  size     Int    // bytes
+  mimeType String
+
+  uploadedById String
+  uploadedBy   User   @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+
+  // Tenant scope
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Attachment target — at most one will be set
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([commentId])
+  @@index([companyId])
+  @@index([uploadedById])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT_LOG
+// Immutable activity log. Never updated or deleted — append-only.
+// Tracks who did what, to which entity, and when.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entity     String      // e.g. "Task", "Comment", "Professional"
+  entityId   String      // the id of the affected record
+  meta       Json?       // optional diff or extra context
+
+  actorId String
+  actor   User   @relation("AuditActor", fields: [actorId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Optional direct task link for task-scoped activity feeds
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([taskId])
+  @@index([companyId, createdAt]) // activity feed queries
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEXTAUTH — required adapter models
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
