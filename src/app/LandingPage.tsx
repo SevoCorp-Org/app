@@ -683,7 +683,7 @@ function Footer() {
           <p className="flex items-center gap-1">
             Built with
             <span className="text-emerald-400">♥</span>
-            for modern teams
+            by meshboc.cc
           </p>
         </div>
       </div>
