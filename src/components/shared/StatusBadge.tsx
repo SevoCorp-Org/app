@@ -1,9 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 
-// Plain string union — no @prisma/client import (safe for client components)
-type TaskStatus = "PENDING" | "APPROVED" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   PENDING:     "Pending",
   APPROVED:    "Approved",
   IN_PROGRESS: "In Progress",
@@ -11,7 +8,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   COMPLETED:   "Completed",
 };
 
-const STATUS_VARIANTS: Record<TaskStatus, "pending" | "approved" | "in_progress" | "review" | "completed"> = {
+const STATUS_VARIANTS: Record<string, "pending" | "approved" | "in_progress" | "review" | "completed"> = {
   PENDING:     "pending",
   APPROVED:    "approved",
   IN_PROGRESS: "in_progress",
@@ -19,10 +16,10 @@ const STATUS_VARIANTS: Record<TaskStatus, "pending" | "approved" | "in_progress"
   COMPLETED:   "completed",
 };
 
-export function StatusBadge({ status }: { status: TaskStatus }) {
+export function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant={STATUS_VARIANTS[status]}>
-      {STATUS_LABELS[status]}
+    <Badge variant={STATUS_VARIANTS[status] ?? "pending"}>
+      {STATUS_LABELS[status] ?? status}
     </Badge>
   );
 }
